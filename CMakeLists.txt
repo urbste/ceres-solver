@@ -371,7 +371,8 @@ if (USE_CUDA)
     CUDA::cusolver${CERES_CUDA_TARGET_SUFFIX}
     CUDA::cusparse${CERES_CUDA_TARGET_SUFFIX})
 
-  find_package(cudss CONFIG)
+  # FindCUDSS sets cudss_DIR for Debian/Ubuntu and calls find_package(cudss CONFIG).
+  include(FindCUDSS)
   if (cudss_FOUND)
     set(cudss_DEPENDENCY "find_dependency(cudss ${cudss_VERSION})")
     list(APPEND CERES_CUDA_LIBRARIES cudss${CERES_CUDA_TARGET_SUFFIX})

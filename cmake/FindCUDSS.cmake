@@ -59,4 +59,4 @@ if(NOT cudss_INCLUDE_DIR)
   unset(_cudss_inc)
 endif()
 
-find_package(cudss CONFIG)
+find_package(cudss CONFIG QUIET)
