@@ -28,10 +28,13 @@
 #
 # FindCUDSS.cmake - Helper to find NVIDIA cuDSS when using find_package(cudss CONFIG).
 #                   On Debian/Ubuntu, libcudss installs to non-standard paths that
-#                   CONFIG mode does not search; this module hints cudss_DIR and
-#                   cudss_INCLUDE_DIR so find_package(cudss CONFIG) can succeed.
-#
-# After inclusion, cudss_FOUND and related variables are set by find_package(cudss CONFIG).
+#                   CONFIG mode does not search; this module only sets cudss_DIR and
+#                   cudss_INCLUDE_DIR so that find_dependency(cudss) or find_package(cudss CONFIG)
+#                   run by the caller can succeed. Do not call find_package(cudss) here:
+#                   when this file is include()d from CeresConfig.cmake, that would run
+#                   cudss-config.cmake in the wrong scope and trigger "Attempt to promote
+#                   imported target to global scope (by setting IMPORTED_GLOBAL) which is
+#                   not built in this directory."
 
 if(NOT cudss_DIR)
   file(GLOB _cudss_cfg "/usr/lib/*/libcudss/*/cmake/cudss/cudss-config.cmake"
@@ -58,5 +61,3 @@ if(NOT cudss_INCLUDE_DIR)
   unset(_cudss_inc_dirs)
   unset(_cudss_inc)
 endif()
-
-find_package(cudss CONFIG QUIET)

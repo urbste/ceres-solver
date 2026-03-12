@@ -371,10 +371,13 @@ if (USE_CUDA)
     CUDA::cusolver${CERES_CUDA_TARGET_SUFFIX}
     CUDA::cusparse${CERES_CUDA_TARGET_SUFFIX})
 
-  # FindCUDSS sets cudss_DIR for Debian/Ubuntu and calls find_package(cudss CONFIG).
+  # FindCUDSS only sets cudss_DIR for Debian/Ubuntu; we run find_package here (top-level)
+  # so cudss-config.cmake runs in the correct scope. When clients load CeresConfig,
+  # include(FindCUDSS) only sets cudss_DIR and find_dependency(cudss) does the find.
   include(FindCUDSS)
+  find_package(cudss CONFIG QUIET)
   if (cudss_FOUND)
-    set(cudss_DEPENDENCY "find_dependency(cudss ${cudss_VERSION})")
+    set(cudss_DEPENDENCY "if(NOT cudss_FOUND)\n  include(FindCUDSS)\n  find_dependency(cudss ${cudss_VERSION})\nendif()")
     list(APPEND CERES_CUDA_LIBRARIES cudss${CERES_CUDA_TARGET_SUFFIX})
   else (cudss_FOUND)
     list(APPEND CERES_COMPILE_OPTIONS CERES_NO_CUDSS)
@@ -767,6 +770,11 @@ install(FILES "${Ceres_BINARY_DIR}/CeresConfig-install.cmake"
         DESTINATION ${RELATIVE_CMAKECONFIG_INSTALL_DIR})
 install(FILES "${Ceres_BINARY_DIR}/CeresConfigVersion.cmake"
         DESTINATION ${RELATIVE_CMAKECONFIG_INSTALL_DIR})
+# Install FindCUDSS.cmake so CeresConfig.cmake can include() it to set cudss_DIR for clients.
+if (cudss_FOUND)
+  install(FILES ${Ceres_SOURCE_DIR}/cmake/FindCUDSS.cmake
+          DESTINATION ${RELATIVE_CMAKECONFIG_INSTALL_DIR})
+endif ()
 
 if (PROVIDE_UNINSTALL_TARGET)
   # Create an uninstall target to remove all installed files.
