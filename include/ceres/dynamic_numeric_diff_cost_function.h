@@ -40,6 +40,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/container/fixed_array.h"
 #include "absl/log/check.h"
 #include "ceres/dynamic_cost_function.h"
 #include "ceres/internal/eigen.h"
@@ -72,36 +73,39 @@ namespace ceres {
 // also specify the sizes after creating the
 // DynamicNumericDiffCostFunction. For example:
 //
-//   DynamicAutoDiffCostFunction<MyCostFunctor, CENTRAL> cost_function;
+//   DynamicNumericDiffCostFunction<MyCostFunctor, CENTRAL> cost_function;
 //   cost_function.AddParameterBlock(5);
 //   cost_function.AddParameterBlock(10);
 //   cost_function.SetNumResiduals(21);
 template <typename CostFunctor, NumericDiffMethodType kMethod = CENTRAL>
 class DynamicNumericDiffCostFunction final : public DynamicCostFunction {
  public:
-  explicit DynamicNumericDiffCostFunction(
-      const CostFunctor* functor,
-      Ownership ownership = TAKE_OWNERSHIP,
-      const NumericDiffOptions& options = NumericDiffOptions())
-      : DynamicNumericDiffCostFunction{
-            std::unique_ptr<const CostFunctor>{functor}, ownership, options} {}
-
+  // Takes ownership of functor by default.
   explicit DynamicNumericDiffCostFunction(
       std::unique_ptr<const CostFunctor> functor,
       const NumericDiffOptions& options = NumericDiffOptions())
-      : DynamicNumericDiffCostFunction{
-            std::move(functor), TAKE_OWNERSHIP, options} {}
+      : DynamicNumericDiffCostFunction(
+            std::move(functor), TAKE_OWNERSHIP, options) {}
 
   // Constructs the CostFunctor on the heap and takes the ownership.
   template <class... Args,
-            std::enable_if_t<std::is_constructible_v<CostFunctor, Args&&...>>* =
-                nullptr>
+            typename = std::enable_if_t<std::is_constructible_v<CostFunctor,
+                                                               Args&&...>>>
   explicit DynamicNumericDiffCostFunction(Args&&... args)
       // NOTE We explicitly use direct initialization using parentheses instead
       // of uniform initialization using braces to avoid narrowing conversion
       // warnings.
-      : DynamicNumericDiffCostFunction{
-            std::make_unique<CostFunctor>(std::forward<Args>(args)...)} {}
+      : DynamicNumericDiffCostFunction(
+            std::make_unique<const CostFunctor>(std::forward<Args>(args)...),
+            TAKE_OWNERSHIP,
+            NumericDiffOptions()) {}
+
+  explicit DynamicNumericDiffCostFunction(
+      const CostFunctor* functor,
+      Ownership ownership = TAKE_OWNERSHIP,
+      const NumericDiffOptions& options = NumericDiffOptions())
+      : DynamicNumericDiffCostFunction(
+            std::unique_ptr<const CostFunctor>(functor), ownership, options) {}
 
   DynamicNumericDiffCostFunction(const DynamicNumericDiffCostFunction&) =
       delete;
@@ -113,7 +117,7 @@ class DynamicNumericDiffCostFunction final : public DynamicCostFunction {
       DynamicNumericDiffCostFunction&& other) noexcept = default;
 
   ~DynamicNumericDiffCostFunction() override {
-    if (ownership_ != TAKE_OWNERSHIP) {
+    if (ownership_ == DO_NOT_TAKE_OWNERSHIP) {
       functor_.release();
     }
   }
@@ -139,9 +143,10 @@ class DynamicNumericDiffCostFunction final : public DynamicCostFunction {
     }
 
     // Create local space for a copy of the parameters which will get mutated.
-    int parameters_size = accumulate(block_sizes.begin(), block_sizes.end(), 0);
-    std::vector<double> parameters_copy(parameters_size);
-    std::vector<double*> parameters_references_copy(block_sizes.size());
+    int parameters_size =
+        std::accumulate(block_sizes.begin(), block_sizes.end(), 0);
+    absl::FixedArray<double> parameters_copy(parameters_size);
+    absl::FixedArray<double*> parameters_references_copy(block_sizes.size());
     parameters_references_copy[0] = parameters_copy.data();
     for (size_t block = 1; block < block_sizes.size(); ++block) {
       parameters_references_copy[block] =
@@ -150,9 +155,9 @@ class DynamicNumericDiffCostFunction final : public DynamicCostFunction {
 
     // Copy the parameters into the local temp space.
     for (size_t block = 0; block < block_sizes.size(); ++block) {
-      memcpy(parameters_references_copy[block],
-             parameters[block],
-             block_sizes[block] * sizeof(*parameters[block]));
+      std::copy_n(parameters[block],
+                  block_sizes[block],
+                  parameters_references_copy[block]);
     }
 
     for (size_t block = 0; block < block_sizes.size(); ++block) {
@@ -220,4 +225,4 @@ DynamicNumericDiffCostFunction(std::unique_ptr<CostFunctor> functor,
 
 }  // namespace ceres
 
-#endif  // CERES_PUBLIC_DYNAMIC_AUTODIFF_COST_FUNCTION_H_
+#endif  // CERES_PUBLIC_DYNAMIC_NUMERIC_DIFF_COST_FUNCTION_H_
