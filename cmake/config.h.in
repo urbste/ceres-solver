@@ -56,6 +56,9 @@
 // If defined, Ceres was compiled without cuDSS.
 @CERES_NO_CUDSS@
 
+// If defined, Ceres uses cuDSS 13 matrix APIs (cudssDataType_t, CSR offset type).
+@CERES_CUDSS_MATRIX_API_V13@
+
 // If defined, Ceres was compiled without Apple's Accelerate framework solvers.
 @CERES_NO_ACCELERATE_SPARSE@
 

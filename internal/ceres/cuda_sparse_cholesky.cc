@@ -43,10 +43,17 @@
 #include "absl/log/log.h"
 #include "ceres/compressed_row_sparse_matrix.h"
 #include "ceres/cuda_buffer.h"
+#include "ceres/internal/config.h"
 #include "ceres/linear_solver.h"
 #include "cudss.h"
 
 namespace ceres::internal {
+
+#if !defined(CERES_NO_CUDSS) && defined(CERES_CUDSS_MATRIX_API_V13)
+inline cudssDataType_t ToCudssDataType(cudaDataType_t cuda_type) {
+  return static_cast<cudssDataType_t>(cuda_type);
+}
+#endif  // CERES_CUDSS_MATRIX_API_V13
 
 inline std::string cuDSSStatusToString(cudssStatus_t status) {
   switch (status) {
@@ -127,6 +134,25 @@ class CERES_NO_EXPORT CuDSSMatrixCSR : public CuDSSMatrixBase {
                       cudssIndexBase_t index_base) {
     CUDSS_STATUS_OK_OR_RETURN_CUDSS_STATUS(Free());
 
+#if defined(CERES_CUDSS_MATRIX_API_V13)
+    const cudssDataType_t offset_type = ToCudssDataType(index_type);
+    const cudssDataType_t cudss_index_type = ToCudssDataType(index_type);
+    const cudssDataType_t cudss_value_type = ToCudssDataType(value_type);
+    return cudssMatrixCreateCsr(&matrix_,
+                                num_rows,
+                                num_cols,
+                                num_nonzeros,
+                                rows_start,
+                                rows_end,
+                                cols,
+                                values,
+                                offset_type,
+                                cudss_index_type,
+                                cudss_value_type,
+                                matrix_type,
+                                matrix_storage_type,
+                                index_base);
+#else
     return cudssMatrixCreateCsr(&matrix_,
                                 num_rows,
                                 num_cols,
@@ -140,6 +166,7 @@ class CERES_NO_EXPORT CuDSSMatrixCSR : public CuDSSMatrixBase {
                                 matrix_type,
                                 matrix_storage_type,
                                 index_base);
+#endif  // CERES_CUDSS_MATRIX_API_V13
   }
 };
 
@@ -153,6 +180,15 @@ class CERES_NO_EXPORT CuDSSMatrixDense : public CuDSSMatrixBase {
                       cudssLayout_t layout) {
     CUDSS_STATUS_OK_OR_RETURN_CUDSS_STATUS(Free());
 
+#if defined(CERES_CUDSS_MATRIX_API_V13)
+    return cudssMatrixCreateDn(&matrix_,
+                               num_rows,
+                               num_cols,
+                               leading_dimension_size,
+                               values,
+                               ToCudssDataType(value_type),
+                               layout);
+#else
     return cudssMatrixCreateDn(&matrix_,
                                num_rows,
                                num_cols,
@@ -160,6 +196,7 @@ class CERES_NO_EXPORT CuDSSMatrixDense : public CuDSSMatrixBase {
                                values,
                                value_type,
                                layout);
+#endif  // CERES_CUDSS_MATRIX_API_V13
   }
 };
 
